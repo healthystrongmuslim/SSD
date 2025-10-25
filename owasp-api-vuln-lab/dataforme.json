@@ -1,0 +1,27 @@
+[
+    {
+        "id": 1,
+        "username": "alice",
+        "password": "alice123",
+        "role": "USER",
+        "email": "alice@cydea.tech",
+        "admin": false
+    },
+    {
+        "id": 2,
+        "username": "bob",
+        "password": "bob123",
+        "role": "ADMIN",
+        "email": "bob@cydea.tech",
+        "admin": true
+    }
+]
+
+// 4522711b-8b14-4447-b05d-1186362d511d
+
+
+// alice
+
+{
+    "token": "eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhbGljZSIsInJvbGUiOiJVU0VSIiwiaXNBZG1pbiI6ZmFsc2UsImlhdCI6MTc2MTMxNDc1OCwiZXhwIjoxNzYxNDAxMTU4fQ.5Kyr3c02Qr5kN9ALnzRYsDzklRpv16Vryi7JLhL9HjE"
+}

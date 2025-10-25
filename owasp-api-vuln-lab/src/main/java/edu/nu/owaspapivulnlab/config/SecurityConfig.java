@@ -16,6 +16,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.filter.OncePerRequestFilter;
 import io.jsonwebtoken.*;
+import io.jsonwebtoken.security.Keys;          // ✅ Added
+import javax.crypto.SecretKey;                 // ✅ Added
+import java.nio.charset.StandardCharsets;      // ✅ Added
+
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -26,47 +32,68 @@ public class SecurityConfig {
     @Value("${app.jwt.secret}")
     private String secret;
 
-    // VULNERABILITY(API7 Security Misconfiguration): overly permissive CORS/CSRF and antMatchers order
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-        http.csrf(csrf -> csrf.disable()); // APIs typically stateless; but add CSRF for state-changing in real apps
+        http.csrf(csrf -> csrf.disable());
         http.sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS));
 
         http.authorizeHttpRequests(reg -> reg
                 .requestMatchers("/api/auth/**", "/h2-console/**").permitAll()
-                // VULNERABILITY: broad permitAll on GET allows data scraping (API1/2 depending on context)
-                .requestMatchers(HttpMethod.GET, "/api/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
+                .requestMatchers(HttpMethod.DELETE, "/api/users/**").hasRole("ADMIN")
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers(HttpMethod.GET, "/api/users", "/api/users/**").authenticated()
                 .anyRequest().authenticated()
         );
 
-        http.headers(h -> h.frameOptions(f -> f.disable())); // allow H2 console
+        http.headers(h -> h.frameOptions(f -> f.disable()));
+        http.addFilterBefore(new JwtFilter(secret),
+                org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
 
-        http.addFilterBefore(new JwtFilter(secret), org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
         return http.build();
     }
 
-    // Minimal JWT filter (VULNERABILITY: weak validation - no audience, issuer checks; long TTL)
     static class JwtFilter extends OncePerRequestFilter {
-        private final String secret;
-        JwtFilter(String secret) { this.secret = secret; }
+        private final SecretKey signingKey;
+
+        JwtFilter(String secret) {
+            // ✅ Convert raw string secret into proper crypto key
+            byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
+            this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+        }
 
         @Override
         protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
                 throws ServletException, IOException {
+
             String auth = request.getHeader("Authorization");
             if (auth != null && auth.startsWith("Bearer ")) {
                 String token = auth.substring(7);
                 try {
-                    Claims c = Jwts.parserBuilder().setSigningKey(secret.getBytes()).build()
-                            .parseClaimsJws(token).getBody();
+                    Claims c = Jwts.parserBuilder()
+                            .setSigningKey(this.signingKey)
+                            .build()
+                            .parseClaimsJws(token)
+                            .getBody();
+
                     String user = c.getSubject();
                     String role = (String) c.get("role");
-                    UsernamePasswordAuthenticationToken authn = new UsernamePasswordAuthenticationToken(user, null,
-                            role != null ? Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role)) : Collections.emptyList());
+
+                    UsernamePasswordAuthenticationToken authn =
+                            new UsernamePasswordAuthenticationToken(
+                                    user, null,
+                                    role != null ?
+                                            Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + role)) :
+                                            Collections.emptyList()
+                            );
                     SecurityContextHolder.getContext().setAuthentication(authn);
-                } catch (JwtException e) {
-                    // VULNERABILITY: swallow errors; continue as anonymous (API7)
+                } catch (JwtException ignored) {
+                    // (VULNERABILITY: Swallowing exceptions - intentionally left due to lab)
                 }
             }
             chain.doFilter(request, response);
