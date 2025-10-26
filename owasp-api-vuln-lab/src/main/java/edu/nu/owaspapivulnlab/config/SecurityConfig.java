@@ -1,10 +1,12 @@
 package edu.nu.owaspapivulnlab.config;
 
+import edu.nu.owaspapivulnlab.service.JwtService;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -15,10 +17,6 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.filter.OncePerRequestFilter;
-import io.jsonwebtoken.*;
-import io.jsonwebtoken.security.Keys;          // ✅ Added
-import javax.crypto.SecretKey;                 // ✅ Added
-import java.nio.charset.StandardCharsets;      // ✅ Added
 
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -29,8 +27,11 @@ import java.util.Collections;
 @Configuration
 public class SecurityConfig {
 
-    @Value("${app.jwt.secret}")
-    private String secret;
+    private final JwtService jwtService;
+
+    public SecurityConfig(JwtService jwtService) {
+        this.jwtService = jwtService;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -52,19 +53,17 @@ public class SecurityConfig {
         );
 
         http.headers(h -> h.frameOptions(f -> f.disable()));
-        http.addFilterBefore(new JwtFilter(secret),
+        http.addFilterBefore(new JwtFilter(jwtService),
                 org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
     static class JwtFilter extends OncePerRequestFilter {
-        private final SecretKey signingKey;
+        private final JwtService jwtService;
 
-        JwtFilter(String secret) {
-            // ✅ Convert raw string secret into proper crypto key
-            byte[] keyBytes = secret.getBytes(StandardCharsets.UTF_8);
-            this.signingKey = Keys.hmacShaKeyFor(keyBytes);
+        JwtFilter(JwtService jwtService) {
+            this.jwtService = jwtService;
         }
 
         @Override
@@ -75,11 +74,7 @@ public class SecurityConfig {
             if (auth != null && auth.startsWith("Bearer ")) {
                 String token = auth.substring(7);
                 try {
-                    Claims c = Jwts.parserBuilder()
-                            .setSigningKey(this.signingKey)
-                            .build()
-                            .parseClaimsJws(token)
-                            .getBody();
+                    Claims c = jwtService.validate(token);
 
                     String user = c.getSubject();
                     String role = (String) c.get("role");
@@ -92,8 +87,11 @@ public class SecurityConfig {
                                             Collections.emptyList()
                             );
                     SecurityContextHolder.getContext().setAuthentication(authn);
-                } catch (JwtException ignored) {
-                    // (VULNERABILITY: Swallowing exceptions - intentionally left due to lab)
+                } catch (JwtException ex) {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    response.getWriter().write("{\"error\":\"invalid or expired token\"}");
+                    return;
                 }
             }
             chain.doFilter(request, response);

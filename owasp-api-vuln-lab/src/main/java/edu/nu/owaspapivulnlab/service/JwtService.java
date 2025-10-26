@@ -1,47 +1,93 @@
 package edu.nu.owaspapivulnlab.service;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Date;
-import java.util.Map; // <-- Make sure this is imported
+import java.util.Map;
 
 @Service
 public class JwtService {
 
-    @Value("${app.jwt.secret}")
-    private String secret;
+    private static final int MIN_KEY_BYTES = 32; // HS256 needs at least 256 bits
 
-    private SecretKey getSigningKey() {
-        // This creates a proper SecretKey from the secret string in application.properties
-        byte[] keyBytes = this.secret.getBytes(StandardCharsets.UTF_8);
+    private final SecretKey signingKey;
+    private final Duration ttl;
+    private final String issuer;
+    private final String audience;
+
+    public JwtService(@Value("${app.jwt.secret}") String secret,
+                      @Value("${app.jwt.ttl-seconds:900}") long ttlSeconds,
+                      @Value("${app.jwt.issuer}") String issuer,
+                      @Value("${app.jwt.audience}") String audience) {
+        if (secret == null || secret.isBlank()) {
+            throw new IllegalStateException("app.jwt.secret must be supplied (preferably via environment variable)");
+        }
+        this.signingKey = buildSigningKey(secret);
+        if (ttlSeconds <= 0 || ttlSeconds > Duration.ofHours(24).getSeconds()) {
+            throw new IllegalStateException("app.jwt.ttl-seconds must be between 1 second and 24 hours");
+        }
+        this.ttl = Duration.ofSeconds(ttlSeconds);
+        if (issuer == null || issuer.isBlank()) {
+            throw new IllegalStateException("app.jwt.issuer must be provided");
+        }
+        if (audience == null || audience.isBlank()) {
+            throw new IllegalStateException("app.jwt.audience must be provided");
+        }
+        this.issuer = issuer;
+        this.audience = audience;
+    }
+
+    private SecretKey buildSigningKey(String rawSecret) {
+        byte[] keyBytes;
+        try {
+            keyBytes = Decoders.BASE64.decode(rawSecret);
+        } catch (IllegalArgumentException ignored) {
+            keyBytes = rawSecret.getBytes(StandardCharsets.UTF_8);
+        }
+        if (keyBytes.length < MIN_KEY_BYTES) {
+            throw new IllegalStateException("JWT secret must be at least 256 bits");
+        }
         return Keys.hmacShaKeyFor(keyBytes);
     }
 
-    /**
-     * --- FIX: Renamed this method to 'issue' to match what AuthController is calling ---
-     *
-     * @param subject The subject of the token (usually the username)
-     * @param claims A map of claims to include (e.g., "role": "USER")
-     * @return A signed JWT string
-     */
     public String issue(String subject, Map<String, Object> claims) {
+        if (subject == null || subject.isBlank()) {
+            throw new IllegalArgumentException("JWT subject is required");
+        }
         long now = System.currentTimeMillis();
-        // VULNERABILITY: Token expires in 1 day - very long!
-        long expiry = now + (24 * 60 * 60 * 1000); 
+        long expiry = now + ttl.toMillis();
 
-        return Jwts.builder()
+        var builder = Jwts.builder()
                 .setSubject(subject)
-                .addClaims(claims) // Add all claims from the map
+                .setIssuer(issuer)
+                .setAudience(audience)
                 .setIssuedAt(new Date(now))
-                .setExpiration(new Date(expiry))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
-                .compact();
+                .setExpiration(new Date(expiry));
+
+        if (claims != null && !claims.isEmpty()) {
+            builder.addClaims(claims);
+        }
+
+        return builder.signWith(signingKey, SignatureAlgorithm.HS256).compact();
+    }
+
+    public Claims validate(String token) {
+        return Jwts.parserBuilder()
+                .requireIssuer(issuer)
+                .requireAudience(audience)
+                .setSigningKey(signingKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
     }
 }
 
