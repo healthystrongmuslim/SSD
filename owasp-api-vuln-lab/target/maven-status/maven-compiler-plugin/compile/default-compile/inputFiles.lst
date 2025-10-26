@@ -9,6 +9,7 @@
 /Users/healthystrongmuslim/Documents/ssd/SSD/owasp-api-vuln-lab/src/main/java/edu/nu/owaspapivulnlab/model/Account.java
 /Users/healthystrongmuslim/Documents/ssd/SSD/owasp-api-vuln-lab/src/main/java/edu/nu/owaspapivulnlab/model/AppUser.java
 /Users/healthystrongmuslim/Documents/ssd/SSD/owasp-api-vuln-lab/src/main/java/edu/nu/owaspapivulnlab/service/JwtService.java
+/Users/healthystrongmuslim/Documents/ssd/SSD/owasp-api-vuln-lab/src/main/java/edu/nu/owaspapivulnlab/web/dto/UserCreateDTO.java
 /Users/healthystrongmuslim/Documents/ssd/SSD/owasp-api-vuln-lab/src/main/java/edu/nu/owaspapivulnlab/config/SecurityConfig.java
 /Users/healthystrongmuslim/Documents/ssd/SSD/owasp-api-vuln-lab/src/main/java/edu/nu/owaspapivulnlab/repo/AppUserRepository.java
 /Users/healthystrongmuslim/Documents/ssd/SSD/owasp-api-vuln-lab/src/main/java/edu/nu/owaspapivulnlab/web/UserController.java

@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import edu.nu.owaspapivulnlab.model.AppUser;
+import edu.nu.owaspapivulnlab.web.dto.UserCreateDTO;
 import edu.nu.owaspapivulnlab.repo.AppUserRepository;
 
 import org.springframework.security.core.Authentication;
@@ -54,12 +55,21 @@ public class UserController {
     
     // --- FIX: Return type changed to UserResponseDTO ---
     @PostMapping
-    public UserResponseDTO create(@Valid @RequestBody AppUser body) {
-        body.setPassword(passwordEncoder.encode(body.getPassword()));
-        AppUser savedUser = users.save(body);
-        
-        // --- 5. Convert the saved entity to a safe DTO ---
-        return UserResponseDTO.fromEntity(savedUser);
+    public ResponseEntity<UserResponseDTO> create(@Valid @RequestBody UserCreateDTO body) {
+        // Map only allowed fields from DTO -> entity to prevent mass assignment of role/isAdmin
+        AppUser toSave = new AppUser();
+        toSave.setUsername(body.getUsername());
+        toSave.setPassword(passwordEncoder.encode(body.getPassword()));
+        toSave.setEmail(body.getEmail());
+        // Enforce default non-privileged role
+        toSave.setRole("USER");
+        toSave.setAdmin(false);
+
+        AppUser savedUser = users.save(toSave);
+
+        // Return 201 Created with safe DTO (no password/role/isAdmin fields)
+        UserResponseDTO dto = UserResponseDTO.fromEntity(savedUser);
+        return ResponseEntity.status(201).body(dto);
     }
 
     // --- FIX: Return type changed to List<UserResponseDTO> ---
