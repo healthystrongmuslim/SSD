@@ -47,7 +47,7 @@ curl -H "Authorization: Bearer $T" http://localhost:8080/api/accounts/mine
 2. Tighten `SecurityFilterChain`: remove `permitAll` on `/api/**`, require auth; enforce role checks. ✅
 3. In controllers, enforce ownership: user can only access their own resources (map subject -> userId). ✅
 4. Implement DTOs to control data exposure; never return password, role, or admin flags. ✅
-5. Add rate limiting (Bucket4j/Resilience4j) to sensitive endpoints.
+5. Add rate limiting (Bucket4j/Resilience4j) to sensitive endpoints. ✅
 6. Prevent Mass Assignment: use explicit request DTOs without `role`, `isAdmin` or validate them server-side.
 7. Harden JWT: strong key from env, short TTL, add issuer/audience, validate signature & expiry strictly.
 8. Reduce error detail in production; proper exception mapping and logging.
