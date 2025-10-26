@@ -57,9 +57,9 @@ class AdditionalSecurityExpectationsTests {
     void jwt_must_be_valid_and_aud_iss_checked() throws Exception {
         // In fixed app, token without proper issuer/audience should be rejected -> 401
         // Use existing login token (which lacks iss/aud) to hit a protected endpoint
-        String weak = login("alice","alice123");
-        mvc.perform(get("/api/accounts/mine").header("Authorization","Bearer "+weak"))
-                .andExpect(status().isUnauthorized()); // Fails now (returns 200/OK)
+    String weak = login("alice","alice123");
+    mvc.perform(get("/api/accounts/mine").header("Authorization","Bearer "+weak))
+        .andExpect(status().isUnauthorized()); // Fails now (returns 200/OK)
     }
 
     @Test

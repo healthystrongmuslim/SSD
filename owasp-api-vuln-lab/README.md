@@ -7,6 +7,7 @@
 
 ```bash
 # Java 17 + Maven required
+# From dir SSD/owasp-api-vuln-lab
 mvn spring-boot:run
 # H2 Console: http://localhost:8080/h2-console (JDBC URL: jdbc:h2:mem:apilab)
 ```
@@ -42,10 +43,10 @@ curl -H "Authorization: Bearer $T" http://localhost:8080/api/accounts/mine
 - **API10: Unsafe Consumption of APIs** (discussion prompt)
 
 ## Student Tasks (Fixes)
-1. Replace plaintext passwords with BCrypt; add signup flow and migrate existing seeds.
-2. Tighten `SecurityFilterChain`: remove `permitAll` on `/api/**`, require auth; enforce role checks.
-3. In controllers, enforce ownership: user can only access their own resources (map subject -> userId).
-4. Implement DTOs to control data exposure; never return password, role, or admin flags.
+1. Replace plaintext passwords with BCrypt; add signup flow and migrate existing seeds. ✅
+2. Tighten `SecurityFilterChain`: remove `permitAll` on `/api/**`, require auth; enforce role checks. ✅
+3. In controllers, enforce ownership: user can only access their own resources (map subject -> userId). ✅
+4. Implement DTOs to control data exposure; never return password, role, or admin flags. ✅
 5. Add rate limiting (Bucket4j/Resilience4j) to sensitive endpoints.
 6. Prevent Mass Assignment: use explicit request DTOs without `role`, `isAdmin` or validate them server-side.
 7. Harden JWT: strong key from env, short TTL, add issuer/audience, validate signature & expiry strictly.
