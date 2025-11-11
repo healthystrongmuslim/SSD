@@ -10,15 +10,30 @@ import edu.nu.owaspapivulnlab.service.JwtService;
 import java.util.HashMap;
 import java.util.Map;
 
+
+// password security:
+import org.springframework.security.crypto.password.PasswordEncoder;
+// password security:
+
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
     private final AppUserRepository users;
     private final JwtService jwt;
+    // password security:
+    private final PasswordEncoder passwordEncoder; 
+    // password security:
 
-    public AuthController(AppUserRepository users, JwtService jwt) {
+    // public AuthController(AppUserRepository users, JwtService jwt) {
+    //     this.users = users;
+    //     this.jwt = jwt;
+    // }
+
+    // constructor to inject passwordEncoder //password security:
+    public AuthController(AppUserRepository users, JwtService jwt, PasswordEncoder passwordEncoder) {
         this.users = users;
         this.jwt = jwt;
+        this.passwordEncoder = passwordEncoder;
     }
 
     public static class LoginReq {
@@ -54,19 +69,39 @@ public class AuthController {
         public void setToken(String token) { this.token = token; }
     }
 
+    // @PostMapping("/login")
+    // public ResponseEntity<?> login(@RequestBody LoginReq req) {
+    //     // VULNERABILITY(API2: Broken Authentication): plaintext password check, no lockout/rate limit/MFA
+    //     AppUser user = users.findByUsername(req.username()).orElse(null);
+    //     if (user != null && user.getPassword().equals(req.password())) {
+    //         Map<String, Object> claims = new HashMap<>();
+    //         claims.put("role", user.getRole());
+    //         claims.put("isAdmin", user.isAdmin()); // VULN: trusts client-side role later
+    //         String token = jwt.issue(user.getUsername(), claims);
+    //         return ResponseEntity.ok(new TokenRes(token));
+    //     }
+    //     Map<String, String> error = new HashMap<>();
+    //     error.put("error", "invalid credentials");
+    //     return ResponseEntity.status(401).body(error);
+    // }
+
+    // password security:
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody LoginReq req) {
-        // VULNERABILITY(API2: Broken Authentication): plaintext password check, no lockout/rate limit/MFA
         AppUser user = users.findByUsername(req.username()).orElse(null);
-        if (user != null && user.getPassword().equals(req.password())) {
+        
+        // ✅ Secure hashed password verification
+        if (user != null && passwordEncoder.matches(req.password(), user.getPassword())) {
             Map<String, Object> claims = new HashMap<>();
             claims.put("role", user.getRole());
-            claims.put("isAdmin", user.isAdmin()); // VULN: trusts client-side role later
+            claims.put("isAdmin", user.isAdmin());
             String token = jwt.issue(user.getUsername(), claims);
             return ResponseEntity.ok(new TokenRes(token));
         }
+
         Map<String, String> error = new HashMap<>();
         error.put("error", "invalid credentials");
         return ResponseEntity.status(401).body(error);
     }
+    // password security:
 }
